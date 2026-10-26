@@ -215,3 +215,34 @@ describe("permisos entre equipos", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("alta de profesores y enlace compartido", () => {
+  it("solo registra correos autorizados con su código, ya confirmados y una sola vez", async () => {
+    await db.exec("reset role; insert into public.teacher_allowlist (email, invite_code) values ('profe@uax.es', 'ABCD1234')");
+    await expect(as(db, null, () => db.query("select public.register_teacher('intruso@x.com','12345678','ABCD1234')"))).rejects.toThrow(/TEACHER_NOT_ALLOWED/);
+    await expect(as(db, null, () => db.query("select public.register_teacher('profe@uax.es','12345678','MAL00000')"))).rejects.toThrow(/TEACHER_NOT_ALLOWED/);
+    await expect(as(db, null, () => db.query("select public.register_teacher('profe@uax.es','corta','abcd1234')"))).rejects.toThrow(/WEAK_PASSWORD/);
+    await as(db, null, () => db.query("select public.register_teacher(' Profe@UAX.es ','contraseña-segura','abcd1234')"));
+    const u = await one<{ ok: boolean; confirmed: boolean; teacher: boolean }>(
+      `select encrypted_password = extensions.crypt('contraseña-segura', encrypted_password) ok, email_confirmed_at is not null confirmed,
+              exists(select 1 from public.teachers t where t.user_id = u.id) teacher
+       from auth.users u where email = 'profe@uax.es'`,
+    );
+    expect(u).toEqual({ ok: true, confirmed: true, teacher: true });
+    await expect(as(db, null, () => db.query("select public.register_teacher('profe@uax.es','otra-clave-123','ABCD1234')"))).rejects.toThrow(/TEACHER_NOT_ALLOWED/);
+  });
+
+  it("el enlace compartido solo funciona si el profesor lo activa y no expone datos privados", async () => {
+    const tok = (await one<{ share_token: string }>("select share_token from public.classroom_sessions where id=$1", [sessionId])).share_token;
+    const off = await as(db, null, () => one<{ j: unknown }>("select public.get_shared_session($1) j", [tok]));
+    expect(off.j).toBeNull();
+    await as(db, TEACHER, () => db.query("update public.classroom_sessions set share_enabled=true where id=$1", [sessionId]));
+    const on = await as(db, null, () => one<{ j: { work: { contributions: unknown[] } } }>("select public.get_shared_session($1) j", [tok]));
+    const text = JSON.stringify(on.j);
+    expect(text).toContain("Decathlon");
+    expect(text).not.toContain(tok);
+    expect(text).not.toContain(ANA);
+    expect(text).not.toContain('"Ana"');
+    expect(on.j.work.contributions.length).toBeGreaterThan(0);
+  });
+});

@@ -1,37 +1,35 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getAdminSupabase, teacherEmailAllowed } from "@/lib/supabase/server";
+import { getServerSupabase } from "@/lib/supabase/server";
 
 const body = z.object({
   email: z.string().trim().toLowerCase().email("Correo no válido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").max(72),
+  code: z.string().trim().min(4, "Escribe el código de invitación").max(20),
 });
 
+const MESSAGES: Record<string, [string, number]> = {
+  TEACHER_NOT_ALLOWED: ["Correo o código de invitación no válidos (o el código ya se usó).", 403],
+  TEACHER_EXISTS: ["Ya existe una cuenta con ese correo: inicia sesión.", 409],
+  WEAK_PASSWORD: ["La contraseña debe tener al menos 8 caracteres.", 400],
+};
+
 /**
- * Alta de profesor: solo para correos incluidos en TEACHER_EMAILS.
- * Se ejecuta en servidor con la service role key (nunca llega al navegador).
+ * Alta de profesor. La comprobación de la lista de correos autorizados y la creación
+ * de la cuenta (ya confirmada) se hacen en la base de datos (RPC register_teacher).
  */
 export async function POST(req: Request) {
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Datos no válidos" }, { status: 400 });
   }
-  const { email, password } = parsed.data;
-  if (!teacherEmailAllowed(email)) {
-    return NextResponse.json({ error: "Este correo no está autorizado como profesor (TEACHER_EMAILS)." }, { status: 403 });
-  }
-  const admin = getAdminSupabase();
-  if (!admin) {
-    return NextResponse.json({ error: "Falta SUPABASE_SERVICE_ROLE_KEY en el servidor." }, { status: 500 });
-  }
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const sb = await getServerSupabase();
+  if (!sb) return NextResponse.json({ error: "Supabase no está configurado." }, { status: 500 });
+  const { error } = await sb.rpc("register_teacher", { p_email: parsed.data.email, p_password: parsed.data.password, p_code: parsed.data.code });
   if (error) {
-    const exists = /already|registered|exists/i.test(error.message);
-    return NextResponse.json(
-      { error: exists ? "Ya existe una cuenta con ese correo: inicia sesión." : error.message },
-      { status: exists ? 409 : 500 },
-    );
+    const hit = Object.entries(MESSAGES).find(([code]) => error.message.includes(code));
+    const [msg, status] = hit ? hit[1] : [error.message, 500];
+    return NextResponse.json({ error: msg }, { status });
   }
-  await admin.from("teachers").upsert({ user_id: data.user.id, name: email.split("@")[0] }, { onConflict: "user_id" });
   return NextResponse.json({ ok: true });
 }

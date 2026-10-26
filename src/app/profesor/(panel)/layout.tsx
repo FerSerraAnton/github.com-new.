@@ -15,8 +15,8 @@ export default async function TeacherLayout({ children }: { children: React.Reac
           <div className="rounded-2xl border border-line bg-white p-6 shadow-card">
             <h1 className="text-xl font-extrabold text-navy-900">Acceso restringido al profesorado</h1>
             <p className="mt-2 text-sm text-muted">
-              La cuenta <b>{guard.email}</b> no tiene permisos de profesor. Añade el correo a <code>TEACHER_EMAILS</code> (y define{" "}
-              <code>SUPABASE_SERVICE_ROLE_KEY</code>) o regístralo en la tabla <code>teachers</code>.
+              La cuenta <b>{guard.email}</b> no tiene permisos de profesor. Añade el correo a la tabla{" "}
+              <code>teacher_allowlist</code> de Supabase y vuelve a entrar.
             </p>
             <div className="mt-4 flex gap-2">
               <SignOutButton />

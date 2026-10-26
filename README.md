@@ -13,34 +13,25 @@
 ### 1. Supabase (gratuito)
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. **SQL Editor → New query**: pega el contenido de [`supabase/setup.sql`](supabase/setup.sql) y pulsa **Run**. Crea tablas, funciones, permisos (RLS) y activa Realtime. Se puede ejecutar varias veces sin problema.
-3. **Authentication → Sign In / Providers**: activa **Allow anonymous sign-ins** (así entran los estudiantes sin correo ni contraseña). Deja activado *Email* para el profesor.
-4. **Project Settings → API**: copia la *Project URL*, la clave pública (*anon / publishable*) y la secreta (*service_role / secret*).
+2. **SQL Editor → New query**: pega [`supabase/setup.sql`](supabase/setup.sql) y pulsa **Run** (tablas, funciones, RLS y Realtime; se puede ejecutar varias veces).
+3. **Authentication → Sign In / Providers**: activa **Allow anonymous sign-ins** (alumnos sin cuenta).
+4. Autoriza a cada profesor (genera su código de invitación de un solo uso):
+   ```sql
+   insert into public.teacher_allowlist (email) values ('profesor@uax.es') returning invite_code;
+   ```
+5. **Project Settings → API**: copia la *Project URL* y la clave pública (*anon* o *publishable*). No hace falta la clave secreta.
 
-### 2a. Railway (recomendado si ya lo usas)
+### 2. Railway
 
 1. Sube este repositorio a GitHub.
-2. En [railway.com](https://railway.com): **New Project → Deploy from GitHub repo** → elige el repositorio. `railway.json` ya indica cómo compilar y arrancar.
-3. En el servicio → **Variables**, añade las mismas de la tabla de abajo (las `NEXT_PUBLIC_*` deben estar antes del build: si las añades después, pulsa **Redeploy**).
-4. **Settings → Networking → Generate Domain** para obtener la URL pública (p. ej. `https://uax-journey-lab.up.railway.app`) y ponla en `NEXT_PUBLIC_SITE_URL`.
-5. Abre `https://TU-DOMINIO/profesor` → *Crear cuenta* con un correo de `TEACHER_EMAILS`.
+2. En [railway.com](https://railway.com): **New Project → Deploy from GitHub repo**. `railway.json` ya indica cómo compilar y arrancar.
+3. **Variables**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_SITE_URL` (la URL pública de Railway). Se leen al compilar: si las cambias, pulsa **Redeploy**.
+4. **Settings → Networking → Generate Domain**.
+5. Abre `https://TU-DOMINIO/profesor` → **Crear cuenta** con tu correo autorizado, una contraseña y el código de invitación.
 
-### 2b. Vercel (alternativa)
+### Vercel (alternativa)
 
-1. Sube este repositorio a GitHub e impórtalo en [vercel.com/new](https://vercel.com/new) (detecta Next.js solo).
-2. En **Environment Variables** añade las de [`.env.example`](.env.example):
-
-   | Variable | Valor |
-   |---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clave *anon / publishable* |
-   | `SUPABASE_SERVICE_ROLE_KEY` | clave *service_role / secret* (solo servidor) |
-   | `TEACHER_EMAILS` | tu correo (varios separados por comas) |
-   | `NEXT_PUBLIC_SITE_URL` | opcional: la URL final, p. ej. `https://journey-lab.vercel.app` |
-
-3. **Deploy**. Abre `https://tu-app.vercel.app/profesor` → *Crear cuenta* con un correo de `TEACHER_EMAILS` → listo.
-
-> Para la clase basta el plan gratuito de Supabase (Realtime admite cientos de conexiones simultáneas) y el plan Hobby de Vercel.
+Importa el repositorio en [vercel.com/new](https://vercel.com/new) con las mismas variables.
 
 ### Desarrollo local
 
@@ -101,7 +92,7 @@ Textos, preguntas, ejemplos, minutos, diapositiva y campos de respuesta se edita
 - Comparativa con otros equipos solo cuando el profesor la activa.
 
 **Profesor**
-- Login seguro (Supabase Auth, cookies httpOnly), alta restringida a `TEACHER_EMAILS`.
+- Login seguro (Supabase Auth, cookies httpOnly); alta solo para correos autorizados en `teacher_allowlist` y con código de invitación de un solo uso.
 - Crear, editar y eliminar sesiones; empresa, caso, instrucciones, equipos y máximo por equipo configurables.
 - Código, enlace y QR; estudiantes conectados en directo; mover o quitar estudiantes; añadir, renombrar y borrar equipos.
 - INICIAR CLASE, SIGUIENTE ACTIVIDAD →, Anterior, ir a cualquier actividad, bloquear / desbloquear / finalizar, finalizar y reabrir la sesión.
@@ -119,12 +110,12 @@ Textos, preguntas, ejemplos, minutos, diapositiva y campos de respuesta se edita
   - el `session_id` se deriva del equipo en la base de datos (no se puede falsear);
   - el código público solo permite consultar datos mínimos y unirse (`get_session_by_code`, `join_session`);
   - el profesor solo ve y gestiona sus sesiones; otro profesor no ve nada ajeno.
-- La clave `service_role` solo se usa en servidor (alta de profesores y enlace de solo lectura).
+- La app no necesita la clave `service_role`: el alta de profesores y el enlace de solo lectura se resuelven con funciones de la base de datos que solo exponen lo imprescindible.
 - No se guardan datos personales: solo el alias. Las exportaciones no incluyen identificadores internos.
 
 ## Pruebas
 
-`npm test` ejecuta 34 pruebas sin necesidad de Supabase:
+`npm test` ejecuta 36 pruebas sin necesidad de Supabase:
 
 - **Permisos** (`tests/db/rls.test.ts`): ejecuta las migraciones reales en PostgreSQL embebido (PGlite) y comprueba aislamiento entre equipos, suplantación, límite de plazas, asignación equilibrada, bloqueo de actividades, permisos de profesor, votos emocionales y comparación.
 - **Instalación** (`tests/db/setup-sql.test.ts`): `setup.sql` es idempotente.

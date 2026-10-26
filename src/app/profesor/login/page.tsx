@@ -12,6 +12,7 @@ export default function TeacherLogin() {
   const [mode, setMode] = useState<"login" | "registro">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export default function TeacherLogin() {
     setError(null);
     try {
       if (mode === "registro") {
-        const r = await fetch("/api/profesor/registro", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
+        const r = await fetch("/api/profesor/registro", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password, code }) });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "No se pudo crear la cuenta");
       }
@@ -65,9 +66,14 @@ export default function TeacherLogin() {
             <Field label="Correo" htmlFor="email">
               <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </Field>
-            <Field label="Contraseña" htmlFor="password" hint={mode === "registro" ? "Mínimo 8 caracteres. Solo correos autorizados (TEACHER_EMAILS)." : undefined}>
+            <Field label="Contraseña" htmlFor="password" hint={mode === "registro" ? "Mínimo 8 caracteres. Solo correos autorizados como profesor." : undefined}>
               <Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "registro" ? 8 : 1} />
             </Field>
+            {mode === "registro" && (
+              <Field label="Código de invitación" htmlFor="code" hint="Te lo da quien administra la aplicación. Solo sirve una vez.">
+                <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoComplete="off" className="font-mono tracking-widest" required />
+              </Field>
+            )}
             <Button type="submit" size="lg" className="w-full" loading={busy}>
               {mode === "login" ? "Entrar" : "Crear cuenta y entrar"}
             </Button>
