@@ -4,7 +4,7 @@
 
 - **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, componentes estilo shadcn/ui, Lucide.
 - **Backend:** Supabase (PostgreSQL + Auth + Realtime) con Row Level Security.
-- **Despliegue:** Vercel. Sin servicios de IA ni APIs de pago.
+- **Despliegue:** Railway (incluye `railway.json`) o Vercel. Sin servicios de IA ni APIs de pago.
 
 ---
 
@@ -17,7 +17,15 @@
 3. **Authentication → Sign In / Providers**: activa **Allow anonymous sign-ins** (así entran los estudiantes sin correo ni contraseña). Deja activado *Email* para el profesor.
 4. **Project Settings → API**: copia la *Project URL*, la clave pública (*anon / publishable*) y la secreta (*service_role / secret*).
 
-### 2. Vercel
+### 2a. Railway (recomendado si ya lo usas)
+
+1. Sube este repositorio a GitHub.
+2. En [railway.com](https://railway.com): **New Project → Deploy from GitHub repo** → elige el repositorio. `railway.json` ya indica cómo compilar y arrancar.
+3. En el servicio → **Variables**, añade las mismas de la tabla de abajo (las `NEXT_PUBLIC_*` deben estar antes del build: si las añades después, pulsa **Redeploy**).
+4. **Settings → Networking → Generate Domain** para obtener la URL pública (p. ej. `https://uax-journey-lab.up.railway.app`) y ponla en `NEXT_PUBLIC_SITE_URL`.
+5. Abre `https://TU-DOMINIO/profesor` → *Crear cuenta* con un correo de `TEACHER_EMAILS`.
+
+### 2b. Vercel (alternativa)
 
 1. Sube este repositorio a GitHub e impórtalo en [vercel.com/new](https://vercel.com/new) (detecta Next.js solo).
 2. En **Environment Variables** añade las de [`.env.example`](.env.example):
