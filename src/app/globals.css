@@ -1,26 +1,103 @@
 @import "tailwindcss";
 
+/* Sistema visual UAX Journey Lab: azul institucional, blanco y gris muy claro,
+   con un color por fase del viaje. Tema claro (pensado para proyectar en el aula). */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --color-navy-950: #061a33;
+  --color-navy-900: #0a2a52;
+  --color-navy-800: #0f3a6e;
+  --color-navy-700: #154b8a;
+  --color-brand: #0a5fb4;
+  --color-brand-light: #2f86e0;
+  --color-sky: #e8f1fb;
+  --color-canvas: #f3f5f9;
+  --color-line: #dfe5ee;
+  --color-ink: #13233a;
+  --color-muted: #5b6b82;
+
+  --color-ph-descubrimiento: #0e9fb8;
+  --color-ph-consideracion: #6d5bd0;
+  --color-ph-compra: #e08a00;
+  --color-ph-retencion: #12946b;
+  --color-ph-recomendacion: #d9475f;
+
+  --radius-xl: 0.9rem;
+  --radius-2xl: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgb(10 42 82 / 0.06), 0 4px 16px -6px rgb(10 42 82 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(10 42 82 / 0.08), 0 14px 32px -12px rgb(10 42 82 / 0.28);
+
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+  --animate-rise: rise 0.4s ease-out both;
+  --animate-celebrate: celebrate 1.1s ease-out both;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.85); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes celebrate {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  20% { opacity: 1; transform: none; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01";
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand-light);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  line-height: 1;
+}
+
+/* Recorrido punteado entre fases */
+.journey-path {
+  background-image: radial-gradient(circle, rgb(10 95 180 / 0.35) 1.5px, transparent 1.6px);
+  background-size: 10px 4px;
+  background-repeat: repeat-x;
+  background-position: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Impresión / PDF */
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body { background: white; }
+  .no-print { display: none !important; }
+  .print-break { break-before: page; }
+  .print-avoid { break-inside: avoid; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
