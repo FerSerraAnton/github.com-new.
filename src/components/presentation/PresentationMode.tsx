@@ -13,6 +13,7 @@ import { FrictionCard, ImprovementCard } from "@/components/journey/cards";
 import { AccessPanel } from "@/components/teacher/TeacherPanels";
 import { TeamComparison } from "./TeamComparison";
 import { cn, formatDate } from "@/lib/utils";
+import { personaOf } from "@/lib/config/personas";
 
 const VIEWS = [
   { key: "acceso", label: "Acceso" },
@@ -129,7 +130,7 @@ export function PresentationMode({ sessionId }: { sessionId: string }) {
         {view === "journey" && matrix && (
           <div className="space-y-5">
             <TeamPicker teams={bundle.teams} idx={teamIdx} onPick={setTeamIdx} />
-            <JourneyHeader matrix={matrix} company={bundle.session.company} scenario={bundle.session.scenario} date={formatDate(new Date())} />
+            <JourneyHeader matrix={matrix} company={bundle.session.company} scenario={bundle.session.scenario} persona={personaOf(bundle.session.personas, team?.persona_key)} date={formatDate(new Date())} />
             <JourneyMap matrix={matrix} projection />
           </div>
         )}

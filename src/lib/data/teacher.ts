@@ -1,5 +1,6 @@
 "use client";
 import { DEFAULT_ACTIVITIES, type ActivityTemplate } from "../config/activities";
+import { DEFAULT_PERSONAS } from "../config/personas";
 import { TEAM_COLORS } from "../config/catalogs";
 import { getSupabase } from "../supabase/client";
 import { track } from "./save-store";
@@ -38,7 +39,10 @@ export async function createSession(input: NewSessionInput): Promise<{ id?: stri
     id = r.data as string | undefined;
     return r;
   });
-  return error ? { error } : { id };
+  if (error) return { error };
+  // Los protousuarios de la clase anterior vienen cargados; el profesor puede editarlos o quitarlos.
+  if (id) await updateSession(id, { personas: DEFAULT_PERSONAS });
+  return { id };
 }
 
 export const updateSession = (id: string, patch: Partial<ClassroomSession>) =>

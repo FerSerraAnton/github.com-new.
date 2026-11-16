@@ -10,6 +10,8 @@ import { PhaseIcon, TimerPill } from "@/components/ui/brand";
 import { TouchpointEditor } from "@/components/journey/TouchpointEditor";
 import { EmotionVotePanel } from "@/components/journey/EmotionVotePanel";
 import { ContributionField } from "./ContributionField";
+import { PersonaCard, TeamPersonaPicker } from "@/components/journey/PersonaCard";
+import { personaOf } from "@/lib/config/personas";
 import { EmotionsReviewPanel, FrictionsPanel, ImprovementsPanel, KpisPanel, PitchPanel } from "./WorkPanels";
 import { useLab } from "./lab-context";
 import type { TimerState } from "@/hooks/use-timer";
@@ -30,8 +32,16 @@ export function ActivityWorkspace({ activity, timer, isCurrent }: { activity: Ac
     }
   };
 
+  const personas = bundle.session.personas ?? [];
+  const persona = personaOf(personas, team.persona_key);
+  const canChange = bundle.session.status !== "finished";
+
   return (
     <div className="space-y-5">
+      {/* Protousuario del equipo: se elige en la primera actividad o en cuanto haga falta */}
+      {personas.length > 0 && (activity.kind === "welcome" || !persona) && <TeamPersonaPicker bundle={bundle} team={team} canChange={canChange} />}
+      {persona && activity.kind !== "welcome" && <PersonaCard persona={persona} compact />}
+
       {/* Cabecera de la actividad */}
       <section className="relative overflow-hidden rounded-2xl bg-white shadow-card" style={{ borderTop: `5px solid ${accent}` }}>
         <div className="p-5 sm:p-7">

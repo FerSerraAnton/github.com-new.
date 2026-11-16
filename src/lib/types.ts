@@ -1,6 +1,7 @@
 import type { ActivityConfig, ActivityKind } from "./config/activities";
 import type { PhaseKey } from "./config/phases";
 import type { Severity } from "./config/catalogs";
+import type { Persona } from "./config/personas";
 
 export type SessionStatus = "draft" | "live" | "finished";
 export type ActivityStatus = "pending" | "active" | "locked" | "completed";
@@ -24,6 +25,7 @@ export interface ClassroomSession {
   share_enabled: boolean;
   share_token: string;
   is_demo: boolean;
+  personas: Persona[];
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +36,7 @@ export interface Team {
   name: string;
   color: string;
   position: number;
+  persona_key: string | null;
 }
 
 export interface Participant {

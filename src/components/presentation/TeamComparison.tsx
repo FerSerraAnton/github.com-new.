@@ -6,6 +6,7 @@ import type { SessionBundle } from "@/lib/types";
 import { EmotionJourneyChart } from "@/components/journey/EmotionJourneyChart";
 import { SeverityBadge } from "@/components/journey/cards";
 import { PhaseIcon } from "@/components/ui/brand";
+import { personaOf } from "@/lib/config/personas";
 
 /**
  * Comparativa didáctica entre equipos: curvas emocionales superpuestas,
@@ -47,6 +48,9 @@ export function TeamComparison({ bundle, large }: { bundle: SessionBundle; large
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.color }} />
                     {t.name}
                   </span>
+                  {personaOf(bundle.session.personas, t.persona_key) && (
+                    <span className="block text-xs font-normal text-muted">{personaOf(bundle.session.personas, t.persona_key)!.name}</span>
+                  )}
                 </th>
                 {PHASES.map((p, pi) => {
                   const pt = series[ti].points[pi];
@@ -84,6 +88,7 @@ export function TeamComparison({ bundle, large }: { bundle: SessionBundle; large
             return (
               <article key={t.id} className="rounded-2xl border border-line bg-white p-5 shadow-card" style={{ borderTop: `5px solid ${t.color}` }}>
                 <h4 className="text-lg font-extrabold text-navy-900">{t.name}</h4>
+                {personaOf(bundle.session.personas, t.persona_key) && <p className="text-sm font-semibold text-brand">Cliente: {personaOf(bundle.session.personas, t.persona_key)!.name}</p>}
                 <p className="mt-0.5 text-xs text-muted">
                   {tps.filter((x) => x.channel_type === "digital").length} contactos digitales · {tps.filter((x) => x.channel_type === "fisico").length} físicos
                 </p>

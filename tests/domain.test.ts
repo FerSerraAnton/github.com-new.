@@ -73,7 +73,7 @@ describe("emociones", () => {
 
 describe("mapa final", () => {
   const participants = [{ id: "p1", session_id: "s", team_id: T1, user_id: "u", alias: "Ana", is_demo: false, joined_at: now }];
-  const team = { id: T1, session_id: "s", name: "Equipo 1", color: "#000", position: 1 };
+  const team = { id: T1, session_id: "s", name: "Equipo 1", color: "#000", position: 1, persona_key: null };
   const c = (id: string, key: string, field: string, selected: boolean, team_id = T1) => ({
     id, team_id, activity_id: act(key).id, participant_id: "p1", field_key: field, phase_key: act(key).phase_key, content: `${key}-${field}-${id}`, selected, ...base,
   });
@@ -126,11 +126,11 @@ describe("exportación", () => {
       session: {
         id: "s", teacher_id: "secret-teacher", code: "ABC123", title: "t", subtitle: "", company: "Decathlon", scenario: "x", instructions: "", max_per_team: 5,
         status: "live", current_activity_id: null, timer_ends_at: null, timer_paused_remaining: null, auto_lock_on_timeout: false,
-        comparison_enabled: false, share_enabled: false, share_token: "secret-token", is_demo: false, created_at: now, updated_at: now,
+        comparison_enabled: false, share_enabled: false, share_token: "secret-token", is_demo: false, personas: [], created_at: now, updated_at: now,
       },
       teams: [
-        { id: T1, session_id: "s", name: "Equipo 1", color: "#000", position: 1 },
-        { id: T2, session_id: "s", name: "Equipo 2", color: "#111", position: 2 },
+        { id: T1, session_id: "s", name: "Equipo 1", color: "#000", position: 1, persona_key: null },
+        { id: T2, session_id: "s", name: "Equipo 2", color: "#111", position: 2, persona_key: null },
       ],
       activities,
       participants: [{ id: "p1", session_id: "s", team_id: T1, user_id: "uid-secret", alias: "Ana", is_demo: false, joined_at: now }],

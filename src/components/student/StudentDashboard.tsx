@@ -13,6 +13,8 @@ import { JourneyHeader, JourneyMap } from "@/components/journey/JourneyMap";
 import { JourneyExport } from "@/components/journey/JourneyExport";
 import { TeamComparison } from "@/components/presentation/TeamComparison";
 import { ActivityWorkspace } from "./ActivityWorkspace";
+import { personaOf } from "@/lib/config/personas";
+import { PersonaCard } from "@/components/journey/PersonaCard";
 import { LabProvider, type LabCtx } from "./lab-context";
 import { cn, formatDate, initials } from "@/lib/utils";
 
@@ -110,8 +112,9 @@ export function StudentDashboard({ bundle, userId, connection }: { bundle: Sessi
         {view === "mapa" && (
           <div className="space-y-5">
             <Card className="p-5">
-              <JourneyHeader matrix={matrix} company={session.company} scenario={session.scenario} date={formatDate(new Date())} extra={<JourneyExport bundle={bundle} teamId={team.id} compact />} />
+              <JourneyHeader matrix={matrix} company={session.company} scenario={session.scenario} persona={personaOf(session.personas, team.persona_key)} date={formatDate(new Date())} extra={<JourneyExport bundle={bundle} teamId={team.id} compact />} />
             </Card>
+            {personaOf(session.personas, team.persona_key) && <PersonaCard persona={personaOf(session.personas, team.persona_key)!} />}
             <JourneyMap matrix={matrix} />
           </div>
         )}

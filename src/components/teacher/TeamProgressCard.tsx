@@ -4,6 +4,7 @@ import { EMOTIONS } from "@/lib/config/catalogs";
 import { contributionCount, emotionCurve, isTeamDone, teamProgress } from "@/lib/domain/journey";
 import type { SessionBundle, Team } from "@/lib/types";
 import { Button, ProgressBar } from "@/components/ui/primitives";
+import { personaOf } from "@/lib/config/personas";
 
 export function TeamProgressCard({ bundle, team, online, onOpen }: { bundle: SessionBundle; team: Team; online: Set<string>; onOpen: () => void }) {
   const { session, activities, participants, work } = bundle;
@@ -25,6 +26,9 @@ export function TeamProgressCard({ bundle, team, online, onOpen }: { bundle: Ses
           {done ? "Terminado ✓" : session.status === "live" ? "Trabajando" : session.status === "finished" ? "Finalizado" : "En espera"}
         </span>
       </div>
+      {session.personas?.length > 0 && (
+        <p className="mt-1 text-sm font-semibold text-brand">Cliente: {personaOf(session.personas, team.persona_key)?.name ?? "sin elegir"}</p>
+      )}
       <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
         <Users className="h-4 w-4" /> {members.length} participantes · <span className="text-emerald-700">{connected} conectados</span>
       </p>

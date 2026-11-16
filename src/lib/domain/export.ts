@@ -38,6 +38,10 @@ export function bundleToCsvRows(bundle: SessionBundle, teamId?: string): CsvRow[
   const keep = (t: string) => !teamId || t === teamId;
   const rows: CsvRow[] = [];
 
+  for (const t of teams.filter((x) => keep(x.id) && x.persona_key)) {
+    const p = (bundle.session.personas ?? []).find((x) => x.key === t.persona_key);
+    if (p) rows.push({ equipo: t.name, tipo: "Cliente (buyer persona)", fase: "", campo: p.name, contenido: p.summary, detalle: p.subtitle, autor: "", fecha: "" });
+  }
   for (const c of work.contributions.filter((x) => keep(x.team_id))) {
     const act = activities.find((a) => a.id === c.activity_id);
     const field = act?.config.fields?.find((f) => f.key === c.field_key);

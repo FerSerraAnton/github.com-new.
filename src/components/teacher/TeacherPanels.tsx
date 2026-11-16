@@ -10,6 +10,8 @@ import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Textarea } fro
 import { JourneyHeader, JourneyMap } from "@/components/journey/JourneyMap";
 import { JourneyExport } from "@/components/journey/JourneyExport";
 import { cn, formatDate } from "@/lib/utils";
+import { DEFAULT_PERSONAS, personaOf, type Persona } from "@/lib/config/personas";
+import { setTeamPersona } from "@/components/journey/PersonaCard";
 
 export function joinUrl(code: string) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
@@ -260,10 +262,11 @@ export function SettingsPanel({ bundle }: { bundle: SessionBundle }) {
           </div>
           <ul className="space-y-2">
             {teams.map((t) => (
-              <TeamRow key={t.id} team={t} members={participants.filter((p) => p.team_id === t.id).length} />
+              <TeamRow key={t.id} team={t} members={participants.filter((p) => p.team_id === t.id).length} personas={session.personas ?? []} />
             ))}
           </ul>
         </Card>
+        <PersonasEditor bundle={bundle} />
         <Card className="space-y-3 p-5">
           <h3 className="text-lg font-extrabold text-navy-900">Compartir y comparar</h3>
           <Toggle
@@ -292,14 +295,24 @@ export function SettingsPanel({ bundle }: { bundle: SessionBundle }) {
   );
 }
 
-function TeamRow({ team, members }: { team: Team; members: number }) {
+function TeamRow({ team, members, personas }: { team: Team; members: number; personas: Persona[] }) {
   const [name, setName] = useState(team.name);
   useEffect(() => setName(team.name), [team.name]);
   return (
     <li className="flex items-center gap-2">
       <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: team.color }} />
       <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== team.name && renameTeam(team.id, name)} aria-label={`Nombre de ${team.name}`} maxLength={40} />
-      <span className="w-20 shrink-0 text-xs text-muted">{members} alumnos</span>
+      {personas.length > 0 && (
+        <Select className="h-9 w-36 shrink-0 text-xs" value={team.persona_key ?? ""} onChange={(e) => setTeamPersona(team.id, e.target.value || null)} aria-label={`Cliente de ${team.name}`}>
+          <option value="">Sin perfil</option>
+          {personas.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      )}
+      <span className="w-16 shrink-0 text-xs text-muted">{members} alumnos</span>
       <Button
         variant="ghost"
         size="icon"
@@ -340,7 +353,7 @@ export function TeamResponsesModal({ bundle, team, onClose }: { bundle: SessionB
   return (
     <Modal open onClose={onClose} wide title={`Respuestas · ${team.name}`}>
       <div className="space-y-5">
-        <JourneyHeader matrix={matrix} company={bundle.session.company} scenario={bundle.session.scenario} date={formatDate(new Date())} extra={<JourneyExport bundle={bundle} teamId={team.id} compact />} />
+        <JourneyHeader matrix={matrix} company={bundle.session.company} scenario={bundle.session.scenario} persona={personaOf(bundle.session.personas, team.persona_key)} date={formatDate(new Date())} extra={<JourneyExport bundle={bundle} teamId={team.id} compact />} />
         <JourneyMap matrix={matrix} />
         <details className="rounded-2xl border border-line p-4">
           <summary className="cursor-pointer font-bold text-navy-900">Todas las aportaciones individuales ({contribs.length})</summary>
@@ -366,5 +379,87 @@ export function TeamResponsesModal({ bundle, team, onClose }: { bundle: SessionB
         </details>
       </div>
     </Modal>
+  );
+}
+
+// ------------------------------------------------------------------ PROTOUSUARIOS
+const slug = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "perfil";
+
+function PersonasEditor({ bundle }: { bundle: SessionBundle }) {
+  const { session } = bundle;
+  const [list, setList] = useState<Persona[]>(session.personas ?? []);
+  const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // Solo se recarga si cambian de verdad los perfiles (no en cada actualización de la sesión).
+  const stored = JSON.stringify(session.personas ?? []);
+  useEffect(() => setList(JSON.parse(stored)), [stored]);
+  const patch = (i: number, p: Partial<Persona>) => setList(list.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const save = async (next = list) => {
+    const keys = new Set<string>();
+    const clean = next
+      .filter((p) => p.name.trim())
+      .map((p) => {
+        let key = p.key || slug(p.name);
+        while (keys.has(key)) key = `${key}-2`;
+        keys.add(key);
+        return { ...p, key };
+      });
+    const e = await updateSession(session.id, { personas: clean });
+    setMsg(e ? { tone: "error", text: e } : { tone: "success", text: "Perfiles guardados: los equipos ya pueden elegirlos." });
+  };
+  return (
+    <Card className="space-y-3 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-extrabold text-navy-900">Protousuarios (buyer personas)</h3>
+        <span className="text-xs text-muted">Cada equipo elige uno al empezar</span>
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted">Sin perfiles: los equipos trabajan sobre el caso general.</p>}
+      {list.map((p, i) => (
+        <details key={i} className="rounded-xl border border-line p-3">
+          <summary className="cursor-pointer font-bold text-navy-900">{p.name || "Nuevo perfil"}</summary>
+          <div className="mt-3 space-y-2">
+            <Input value={p.name} onChange={(e) => patch(i, { name: e.target.value })} placeholder="Nombre · edad" aria-label="Nombre" />
+            <Input value={p.subtitle} onChange={(e) => patch(i, { subtitle: e.target.value })} placeholder="Caso · rol de compra" aria-label="Subtítulo" />
+            <Textarea value={p.summary} onChange={(e) => patch(i, { summary: e.target.value })} rows={3} placeholder="Situación" aria-label="Situación" />
+            <Textarea value={p.quote} onChange={(e) => patch(i, { quote: e.target.value })} rows={2} placeholder="Frase representativa" aria-label="Frase" />
+            <Textarea
+              value={p.details.map((d) => `${d.label}: ${d.value}`).join("\n")}
+              onChange={(e) =>
+                patch(i, {
+                  details: e.target.value
+                    .split("\n")
+                    .map((l) => l.split(":"))
+                    .filter((x) => x[0].trim())
+                    .map(([label, ...rest]) => ({ label: label.trim(), value: rest.join(":").trim() })),
+                })
+              }
+              rows={5}
+              className="font-mono text-xs"
+              aria-label="Ficha: una línea por dato, Etiqueta: valor"
+            />
+            <Button size="sm" variant="danger" onClick={() => setList(list.filter((_, j) => j !== i))}>
+              Quitar perfil
+            </Button>
+          </div>
+        </details>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => save()}>Guardar perfiles</Button>
+        <Button size="sm" variant="secondary" onClick={() => setList([...list, { key: "", name: "", subtitle: "", summary: "", quote: "", details: [] }])}>
+          Añadir perfil
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setList(DEFAULT_PERSONAS);
+            void save(DEFAULT_PERSONAS);
+          }}
+        >
+          Cargar Lucía, Marcos y Sara
+        </Button>
+      </div>
+      {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+    </Card>
   );
 }

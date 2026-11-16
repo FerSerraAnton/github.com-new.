@@ -6,6 +6,8 @@ import { JourneyHeader, JourneyMap } from "./JourneyMap";
 import { FrictionCard, ImprovementCard, KpiCard } from "./cards";
 import { DemoBadge } from "@/components/ui/brand";
 import { formatDate } from "@/lib/utils";
+import { personaOf } from "@/lib/config/personas";
+import { PersonaCard } from "./PersonaCard";
 
 /** Documento completo de un equipo: el que se imprime / guarda como PDF o se comparte en solo lectura. */
 export function JourneyDocument({ bundle, team, hideAuthors }: { bundle: SessionBundle; team: Team; hideAuthors?: boolean }) {
@@ -17,6 +19,7 @@ export function JourneyDocument({ bundle, team, hideAuthors }: { bundle: Session
   const kpis = work.kpis.filter((k) => k.team_id === team.id);
   const pitch = work.summaries.find((s) => s.team_id === team.id);
   const members = participants.filter((p) => p.team_id === team.id);
+  const persona = personaOf(session.personas, team.persona_key);
 
   return (
     <article className="space-y-6">
@@ -25,6 +28,7 @@ export function JourneyDocument({ bundle, team, hideAuthors }: { bundle: Session
           matrix={matrix}
           company={session.company}
           scenario={session.scenario}
+          persona={persona}
           date={formatDate(new Date())}
           extra={
             <>
@@ -35,6 +39,8 @@ export function JourneyDocument({ bundle, team, hideAuthors }: { bundle: Session
           }
         />
       </div>
+
+      {persona && <PersonaCard persona={persona} open />}
 
       <JourneyMap matrix={matrix} />
 

@@ -6,6 +6,7 @@ import { emotionLabel, type JourneyMatrix, type MapItem, type PhaseColumn } from
 import { EmotionJourneyChart } from "./EmotionJourneyChart";
 import { FrictionCard, ImprovementCard, KpiCard, SeverityBadge } from "./cards";
 import { PhaseIcon } from "@/components/ui/brand";
+import type { Persona } from "@/lib/config/personas";
 import { Modal } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
@@ -114,7 +115,7 @@ function Cell({ col, row }: { col: PhaseColumn; row: (typeof ROWS)[number]["key"
   }
 }
 
-export function JourneyHeader({ matrix, company, scenario, date, extra }: { matrix: JourneyMatrix; company: string; scenario: string; date?: string; extra?: ReactNode }) {
+export function JourneyHeader({ matrix, company, scenario, date, extra, persona }: { matrix: JourneyMatrix; company: string; scenario: string; date?: string; extra?: ReactNode; persona?: Persona | null }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
@@ -123,7 +124,13 @@ export function JourneyHeader({ matrix, company, scenario, date, extra }: { matr
           <span className="h-3.5 w-3.5 rounded-full" style={{ background: matrix.team.color }} />
           {matrix.team.name}
         </h2>
-        <p className="mt-1 max-w-3xl text-sm text-ink/75">{scenario}</p>
+        {persona ? (
+          <p className="mt-1 max-w-3xl text-sm text-ink/75">
+            <b className="text-navy-900">Cliente: {persona.name}</b> · {persona.subtitle}
+          </p>
+        ) : (
+          <p className="mt-1 max-w-3xl text-sm text-ink/75">{scenario}</p>
+        )}
       </div>
       <div className="flex flex-col items-end gap-2 text-right text-sm text-muted">
         {date && <span>{date}</span>}

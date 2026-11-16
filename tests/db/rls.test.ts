@@ -216,6 +216,19 @@ describe("permisos entre equipos", () => {
   });
 });
 
+describe("protousuarios", () => {
+  it("un miembro elige el perfil de su equipo; otros equipos y perfiles inexistentes no", async () => {
+    await as(db, TEACHER, () =>
+      db.query(`update public.classroom_sessions set personas='[{"key":"lucia","name":"Lucía"},{"key":"sara","name":"Sara"}]' where id=$1`, [sessionId]),
+    );
+    await as(db, ANA, () => db.query("select public.set_team_persona($1,'sara')", [teamA]));
+    const t = await one<{ persona_key: string }>("select persona_key from public.teams where id=$1", [teamA]);
+    expect(t.persona_key).toBe("sara");
+    await expect(as(db, BEA, () => db.query("select public.set_team_persona($1,'lucia')", [teamA]))).rejects.toThrow(/NOT_ALLOWED/);
+    await expect(as(db, ANA, () => db.query("select public.set_team_persona($1,'nadie')", [teamA]))).rejects.toThrow(/PERSONA_NOT_FOUND/);
+  });
+});
+
 describe("sesión de demostración", () => {
   it("el profesor puede sembrar votos de mejoras de su sesión, pero no otro profesor", async () => {
     const act = (await one<{ id: string }>("select id from public.activities where session_id=$1 and key='mejoras'", [sessionId])).id;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { DEFAULT_ACTIVITIES } from "@/lib/config/activities";
+import { DEFAULT_PERSONAS } from "@/lib/config/personas";
 import { EMPTY_WORK, type Activity, type SessionBundle } from "@/lib/types";
 import { buildJourneyMatrix } from "@/lib/domain/journey";
 import { JourneyMap } from "@/components/journey/JourneyMap";
@@ -20,11 +21,11 @@ const bundle: SessionBundle = {
   session: {
     id: "s", teacher_id: "t", code: "ABC123", title: "Caso Decathlon", subtitle: "", company: "Decathlon", scenario: "Quiere empezar a correr.", instructions: "",
     max_per_team: 5, status: "live", current_activity_id: act("compra").id, timer_ends_at: null, timer_paused_remaining: null, auto_lock_on_timeout: false,
-    comparison_enabled: true, share_enabled: false, share_token: "x", is_demo: true, created_at: now, updated_at: now,
+    comparison_enabled: true, share_enabled: false, share_token: "x", is_demo: true, personas: DEFAULT_PERSONAS, created_at: now, updated_at: now,
   },
   teams: [
-    { id: "t1", session_id: "s", name: "Equipo 1", color: "#0A5FB4", position: 1 },
-    { id: "t2", session_id: "s", name: "Equipo 2", color: "#D9475F", position: 2 },
+    { id: "t1", session_id: "s", name: "Equipo 1", color: "#0A5FB4", position: 1, persona_key: "sara" },
+    { id: "t2", session_id: "s", name: "Equipo 2", color: "#D9475F", position: 2, persona_key: null },
   ],
   activities,
   participants: [
