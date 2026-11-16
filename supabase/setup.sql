@@ -933,3 +933,11 @@ grant execute on function public.register_teacher(text, text, text) to anon, aut
 -- El emoji se guarda al tocarlo; el porqué se completa después (la app lo exige y avisa si falta).
 alter table public.emotion_votes drop constraint if exists emotion_votes_reason_check;
 alter table public.emotion_votes add constraint emotion_votes_reason_check check (char_length(reason) <= 600);
+
+
+-- >>> 20261116000006_teacher_improvement_votes.sql
+-- El profesor también puede registrar votos de mejoras (lo necesita la sesión de demostración).
+drop policy if exists improvement_votes_insert on public.improvement_votes;
+create policy improvement_votes_insert on public.improvement_votes for insert to authenticated
+  with check (public.is_session_owner(session_id)
+    or (public.owns_participant(participant_id, team_id) and public.team_session_live(team_id)));

@@ -216,6 +216,19 @@ describe("permisos entre equipos", () => {
   });
 });
 
+describe("sesión de demostración", () => {
+  it("el profesor puede sembrar votos de mejoras de su sesión, pero no otro profesor", async () => {
+    const act = (await one<{ id: string }>("select id from public.activities where session_id=$1 and key='mejoras'", [sessionId])).id;
+    const imp = await as(db, TEACHER, () =>
+      one<{ id: string }>("insert into public.improvements (team_id, activity_id, participant_id, problem, solution, phase_key) values ($1,$2,$3,'Tallas','Test de talla','consideracion') returning id", [teamA, act, anaP]),
+    );
+    await as(db, TEACHER, () => db.query("insert into public.improvement_votes (improvement_id, participant_id, team_id) values ($1,$2,$3)", [imp.id, carlosP, teamA]));
+    await expect(
+      as(db, OTHER_TEACHER, () => db.query("insert into public.improvement_votes (improvement_id, participant_id, team_id) values ($1,$2,$3)", [imp.id, anaP, teamA])),
+    ).rejects.toThrow(/row-level security/);
+  });
+});
+
 describe("alta de profesores y enlace compartido", () => {
   it("solo registra correos autorizados con su código, ya confirmados y una sola vez", async () => {
     await db.exec("reset role; insert into public.teacher_allowlist (email, invite_code) values ('profe@uax.es', 'ABCD1234')");
