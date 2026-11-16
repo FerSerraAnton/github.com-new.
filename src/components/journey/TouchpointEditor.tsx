@@ -22,9 +22,12 @@ export function TouchpointEditor({ activity, phase, label }: { activity: Activit
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const pick = (name: string, t: ChannelType) => {
-    setChannel(name);
-    setType(t);
+  // Un toque en un canal del catálogo lo añade (o lo quita si ya era tuyo).
+  const pick = async (name: string, t: ChannelType) => {
+    const mineSame = list.find((x) => x.participant_id === me.id && x.channel === name);
+    setError(null);
+    const err = mineSame ? await deleteRow("touchpoints", mineSame.id) : await addTouchpoint(activity, me, phase, { channel: name, channel_type: t, description: "" });
+    if (err) setError(err);
   };
 
   const submit = async () => {
@@ -67,6 +70,7 @@ export function TouchpointEditor({ activity, phase, label }: { activity: Activit
 
       {writable && (
         <div className="space-y-3 rounded-xl bg-canvas p-3">
+          <p className="text-xs text-muted">Toca los canales que usa el cliente en esta fase: se guardan al momento.</p>
           {(["digital", "fisico"] as const).map((group) => (
             <div key={group}>
               <p className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-muted">
@@ -78,13 +82,18 @@ export function TouchpointEditor({ activity, phase, label }: { activity: Activit
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => pick(c.name, c.type)}
-                    aria-pressed={channel === c.name}
+                    onClick={() => void pick(c.name, c.type)}
+                    aria-pressed={list.some((x) => x.participant_id === me.id && x.channel === c.name)}
                     className={cn(
                       "cursor-pointer rounded-full border px-2.5 py-1 text-xs font-semibold transition",
-                      channel === c.name ? "border-brand bg-brand text-white" : "border-line bg-white hover:border-brand-light",
+                      list.some((x) => x.participant_id === me.id && x.channel === c.name)
+                        ? "border-brand bg-brand text-white"
+                        : list.some((x) => x.channel === c.name)
+                          ? "border-brand/40 bg-sky text-brand"
+                          : "border-line bg-white hover:border-brand-light",
                     )}
                   >
+                    {list.some((x) => x.participant_id === me.id && x.channel === c.name) ? "✓ " : "+ "}
                     {c.name}
                   </button>
                 ))}
@@ -92,7 +101,7 @@ export function TouchpointEditor({ activity, phase, label }: { activity: Activit
             </div>
           ))}
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="…o escribe otro canal (Otros)" aria-label="Canal" maxLength={60} />
+            <Input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="¿Otro canal? Escríbelo aquí" aria-label="Otro canal" maxLength={60} />
             <div className="flex rounded-xl border border-line bg-white p-1" role="group" aria-label="Tipo de canal">
               {(["digital", "fisico"] as const).map((t) => (
                 <button
@@ -108,9 +117,9 @@ export function TouchpointEditor({ activity, phase, label }: { activity: Activit
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Qué hace o qué busca ahí? (opcional)" aria-label="Descripción del punto de contacto" maxLength={500} />
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="¿Qué hace ahí? (opcional)" aria-label="Descripción del punto de contacto" maxLength={500} />
             <Button onClick={submit} loading={busy} disabled={!channel.trim()}>
-              <Plus className="h-4 w-4" /> Añadir punto de contacto
+              <Plus className="h-4 w-4" /> Añadir otro canal
             </Button>
           </div>
           {error && (

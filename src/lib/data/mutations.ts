@@ -19,6 +19,21 @@ export const addContribution = (activity: Activity, me: Participant, field_key: 
     sb().from("contributions").insert({ ...base(activity, me), field_key, content: content.trim(), phase_key: activity.phase_key }),
   );
 
+/** Inserta y devuelve el id (para el guardado automático de la respuesta propia). */
+export async function insertContributionId(activity: Activity, me: Participant, field_key: string, content: string) {
+  let id: string | null = null;
+  const error = await track(async () => {
+    const r = await sb()
+      .from("contributions")
+      .insert({ ...base(activity, me), field_key, content: content.trim(), phase_key: activity.phase_key })
+      .select("id")
+      .single();
+    id = (r.data as { id: string } | null)?.id ?? null;
+    return r;
+  });
+  return { id, error };
+}
+
 export const updateContribution = (id: string, content: string) =>
   track(() => sb().from("contributions").update({ content: content.trim() }).eq("id", id));
 
@@ -82,4 +97,12 @@ export const upsertSummary = (me: Participant, s: Pick<TeamJourneySummary, "dete
     sb()
       .from("team_journey_summaries")
       .upsert({ team_id: me.team_id!, ...s, updated_by: me.id, updated_at: new Date().toISOString() }, { onConflict: "team_id" }),
+  );
+
+/** Guarda solo los campos del pitch que han cambiado (varios compañeros a la vez sin pisarse). */
+export const upsertSummaryFields = (me: Participant, patch: Partial<Pick<TeamJourneySummary, "detected" | "detected_phase" | "proposal" | "because" | "measure_with" | "conclusion">>) =>
+  track(() =>
+    sb()
+      .from("team_journey_summaries")
+      .upsert({ team_id: me.team_id!, ...patch, updated_by: me.id, updated_at: new Date().toISOString() }, { onConflict: "team_id" }),
   );

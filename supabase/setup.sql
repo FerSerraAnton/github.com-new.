@@ -927,3 +927,9 @@ end $$;
 
 revoke all on function public.register_teacher(text, text, text) from public;
 grant execute on function public.register_teacher(text, text, text) to anon, authenticated;
+
+
+-- >>> 20261116000005_emotion_reason_optional.sql
+-- El emoji se guarda al tocarlo; el porqué se completa después (la app lo exige y avisa si falta).
+alter table public.emotion_votes drop constraint if exists emotion_votes_reason_check;
+alter table public.emotion_votes add constraint emotion_votes_reason_check check (char_length(reason) <= 600);

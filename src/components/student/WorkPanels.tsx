@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveHint } from "./ContributionField";
 import { CheckCircle2, Plus } from "lucide-react";
 import { KPI_CATALOG, SEVERITIES } from "@/lib/config/catalogs";
 import { PHASES, type PhaseKey } from "@/lib/config/phases";
-import { addFriction, addImprovement, addKpi, deleteRow, toggleImprovementVote, upsertSummary } from "@/lib/data/mutations";
+import { addFriction, addImprovement, addKpi, deleteRow, toggleImprovementVote, upsertSummaryFields } from "@/lib/data/mutations";
 import { emotionCurve, rankedImprovements } from "@/lib/domain/journey";
 import { firstError, frictionSchema, improvementSchema, kpiSchema } from "@/lib/domain/validation";
 import type { Activity } from "@/lib/types";
@@ -116,7 +118,7 @@ export function FrictionsPanel({ activity }: { activity: Activity }) {
         </div>
       )}
       {writable && (
-        <FormCard title="Nueva fricción" onSubmit={submit} busy={busy} error={error} submitLabel="Añadir fricción">
+        <FormCard title="Nueva fricción" onSubmit={submit} busy={busy} error={error} submitLabel="Guardar fricción">
           <Field label="Título" htmlFor="fr-title">
             <Input id="fr-title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} maxLength={120} placeholder="Ej.: No entiende las tallas" />
           </Field>
@@ -202,7 +204,7 @@ export function ImprovementsPanel({ activity }: { activity: Activity }) {
         </div>
       )}
       {writable && (
-        <FormCard title="Nueva propuesta de mejora" onSubmit={submit} busy={busy} error={error} submitLabel="Añadir propuesta">
+        <FormCard title="Nueva propuesta de mejora" onSubmit={submit} busy={busy} error={error} submitLabel="Guardar propuesta">
           <div className="sm:col-span-2">
             <Field label="Problema que pretende resolver" htmlFor="im-fr" hint={frictions.length ? "Elige una fricción detectada o escribe el problema" : "Aún no hay fricciones: describe el problema"}>
               {frictions.length > 0 && (
@@ -286,7 +288,7 @@ export function KpisPanel({ activity }: { activity: Activity }) {
         </div>
       )}
       {writable && (
-        <FormCard title="Nuevo KPI" onSubmit={submit} busy={busy} error={error} submitLabel="Añadir KPI">
+        <FormCard title="Nuevo KPI" onSubmit={submit} busy={busy} error={error} submitLabel="Guardar KPI">
           <div className="sm:col-span-2">
             <p className="mb-1.5 text-sm font-semibold text-navy-900">Catálogo de indicadores</p>
             <div className="flex flex-wrap gap-1.5">
@@ -379,41 +381,42 @@ export function EmotionsReviewPanel({ activity }: { activity: Activity }) {
 export function PitchPanel({ activity }: { activity: Activity }) {
   const { bundle, me, team, canWrite, aliasOf } = useLab();
   const writable = canWrite(activity);
-  const remote = bundle.work.summaries.find((s) => s.team_id === team.id);
+  const remote = bundle.work.summaries.find((x) => x.team_id === team.id);
   const top = rankedImprovements(bundle.work, team.id)[0];
   const blank = { detected: "", detected_phase: "", proposal: "", because: "", measure_with: "", conclusion: "" };
-  const [s, setS] = useState(remote ? pick(remote) : blank);
-  const [base, setBase] = useState(remote?.updated_at ?? null);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const [dirty, setDirty] = useState(false);
+  type Pitch = typeof blank;
+  const pick = (r: Pitch): Pitch => ({ detected: r.detected, detected_phase: r.detected_phase, proposal: r.proposal, because: r.because, measure_with: r.measure_with, conclusion: r.conclusion });
+  const [s, setS] = useState<Pitch>(remote ? pick(remote) : blank);
+  const editing = useRef(false);
+  const pendingPatch = useRef<Partial<Pitch>>({});
 
-  function pick(r: typeof blank) {
-    return { detected: r.detected, detected_phase: r.detected_phase, proposal: r.proposal, because: r.because, measure_with: r.measure_with, conclusion: r.conclusion };
-  }
+  // Cada cambio se guarda solo, y solo con los campos tocados: dos compañeros pueden
+  // escribir frases distintas a la vez sin pisarse.
+  const auto = useAutosave<Partial<Pitch>>(async () => {
+    const patch = pendingPatch.current;
+    pendingPatch.current = {};
+    if (!Object.keys(patch).length) return null;
+    const err = await upsertSummaryFields(me, patch);
+    if (err) pendingPatch.current = { ...patch, ...pendingPatch.current };
+    return err;
+  }, 900);
 
-  // Si otro compañero guarda mientras no estoy editando, cargar su versión.
+  // Lo que escriben los compañeros aparece cuando no estoy editando.
   useEffect(() => {
-    if (remote && !dirty) {
-      setS(pick(remote));
-      setBase(remote.updated_at);
-    }
+    if (remote && !editing.current && !auto.dirty) setS(pick(remote));
   }, [remote?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const conflict = dirty && remote && remote.updated_at !== base && remote.updated_by !== me.id;
-
-  const update = (patch: Partial<typeof blank>) => {
-    setS({ ...s, ...patch });
-    setDirty(true);
+  const update = (patch: Partial<Pitch>) => {
+    setS((cur) => ({ ...cur, ...patch }));
+    pendingPatch.current = { ...pendingPatch.current, ...patch };
+    auto.schedule(patch);
   };
-
-  const save = async () => {
-    setBusy(true);
-    const err = await upsertSummary(me, s);
-    setBusy(false);
-    if (err) return setMsg({ tone: "error", text: err });
-    setDirty(false);
-    setMsg({ tone: "success", text: "¡Pitch guardado para todo el equipo!" });
+  const focusProps = {
+    onFocus: () => (editing.current = true),
+    onBlur: () => {
+      editing.current = false;
+      void auto.flush();
+    },
   };
 
   const fill = () => {
@@ -424,27 +427,20 @@ export function PitchPanel({ activity }: { activity: Activity }) {
       detected_phase: s.detected_phase || top.phase_key,
       measure_with: s.measure_with || bundle.work.kpis.find((k) => k.team_id === team.id && k.improvement_id === top.id)?.name || "",
     });
+    void auto.flush();
   };
 
   const line = "rounded-xl border border-line bg-white px-3 py-2 text-[15px]";
   return (
     <div className="space-y-4">
-      {conflict && (
-        <Alert tone="warning">
-          {aliasOf(remote!.updated_by)} ha guardado otra versión mientras editabas. Si guardas, sustituirás la suya.{" "}
-          <button className="cursor-pointer font-bold underline" onClick={() => (setS(pick(remote!)), setBase(remote!.updated_at), setDirty(false))}>
-            Cargar su versión
-          </button>
-        </Alert>
-      )}
       <section className="rounded-2xl bg-navy-900 p-5 text-white shadow-lift sm:p-7">
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-white/60">Pitch de 30 segundos</p>
+        <p className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-white/60">Pitch de 30 segundos · lo escribe todo el equipo</p>
         <div className="space-y-3 text-lg font-semibold leading-relaxed">
           <p className="flex flex-wrap items-center gap-2">
             «Detectamos
-            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.detected} onChange={(e) => update({ detected: e.target.value })} disabled={!writable} aria-label="Qué detectamos" maxLength={600} />
+            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.detected} onChange={(e) => update({ detected: e.target.value })} {...focusProps} disabled={!writable} aria-label="Qué detectamos" maxLength={600} />
             en la fase
-            <select className={cn(line, "text-ink")} value={s.detected_phase} onChange={(e) => update({ detected_phase: e.target.value })} disabled={!writable} aria-label="Fase">
+            <select className={cn(line, "text-ink")} value={s.detected_phase} onChange={(e) => (update({ detected_phase: e.target.value }), void auto.flush())} disabled={!writable} aria-label="Fase">
               <option value="">…</option>
               {PHASES.map((p) => (
                 <option key={p.key} value={p.key}>
@@ -456,35 +452,32 @@ export function PitchPanel({ activity }: { activity: Activity }) {
           </p>
           <p className="flex flex-wrap items-center gap-2">
             «Proponemos
-            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.proposal} onChange={(e) => update({ proposal: e.target.value })} disabled={!writable} aria-label="Qué proponemos" maxLength={600} />
+            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.proposal} onChange={(e) => update({ proposal: e.target.value })} {...focusProps} disabled={!writable} aria-label="Qué proponemos" maxLength={600} />
             porque
-            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.because} onChange={(e) => update({ because: e.target.value })} disabled={!writable} aria-label="Por qué" maxLength={600} />
+            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.because} onChange={(e) => update({ because: e.target.value })} {...focusProps} disabled={!writable} aria-label="Por qué" maxLength={600} />
             .»
           </p>
           <p className="flex flex-wrap items-center gap-2">
             «Lo mediremos con
-            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.measure_with} onChange={(e) => update({ measure_with: e.target.value })} disabled={!writable} aria-label="KPI" maxLength={300} />
+            <input className={cn(line, "min-w-[200px] flex-1 text-ink")} value={s.measure_with} onChange={(e) => update({ measure_with: e.target.value })} {...focusProps} disabled={!writable} aria-label="KPI" maxLength={300} />
             .»
           </p>
         </div>
       </section>
       <Field label="Conclusión del equipo (opcional)" htmlFor="pitch-conc">
-        <Textarea id="pitch-conc" value={s.conclusion} onChange={(e) => update({ conclusion: e.target.value })} disabled={!writable} rows={3} maxLength={1500} placeholder="El momento más importante del recorrido es… · El dato que necesitaríamos comprobar es…" />
+        <Textarea id="pitch-conc" value={s.conclusion} onChange={(e) => update({ conclusion: e.target.value })} {...focusProps} disabled={!writable} rows={3} maxLength={1500} placeholder="El momento más importante del recorrido es… · El dato que necesitaríamos comprobar es…" />
       </Field>
       {writable && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={save} loading={busy} size="lg">
-            Guardar pitch del equipo
-          </Button>
+          <AutosaveHint status={auto.status} error={auto.error} hasText={Object.values(s).some((v) => v.trim())} />
           {top && (
             <Button variant="secondary" onClick={fill}>
               Rellenar con la mejora más votada
             </Button>
           )}
-          {remote && !dirty && <span className="text-sm text-muted">Última edición: {aliasOf(remote.updated_by)}</span>}
+          {remote?.updated_by && <span className="text-sm text-muted">Última edición: {aliasOf(remote.updated_by)}</span>}
         </div>
       )}
-      {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
     </div>
   );
 }

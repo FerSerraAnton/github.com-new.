@@ -24,12 +24,36 @@ const VIEWS = [
 ] as const;
 type ViewKey = (typeof VIEWS)[number]["key"];
 
+/** Vista que corresponde a la actividad en curso. */
+function viewForActivity(status: string | undefined, kind: string | undefined): ViewKey {
+  if (!status || status === "draft" || !kind || kind === "welcome") return "acceso";
+  if (status === "finished") return "comparativa";
+  switch (kind) {
+    case "emotions":
+      return "emociones";
+    case "frictions":
+      return "fricciones";
+    case "improvements":
+    case "kpis":
+    case "pitch":
+      return "propuestas";
+    default:
+      return "journey";
+  }
+}
+
 /** Pantalla limpia para el proyector: sin controles administrativos, se actualiza en directo. */
 export function PresentationMode({ sessionId }: { sessionId: string }) {
   const { bundle, error } = useLiveBundle({ sessionId });
   const timer = useTimer(bundle?.session ?? null);
-  const [view, setView] = useState<ViewKey>("acceso");
+  // Por defecto la proyección sigue a la actividad en curso; si el profesor elige
+  // una vista a mano, se queda en ella hasta que pulse «Seguir la clase».
+  const [manualView, setManualView] = useState<ViewKey | null>(null);
   const [teamIdx, setTeamIdx] = useState(0);
+  const currentKind = bundle?.activities.find((a) => a.id === bundle.session.current_activity_id)?.kind;
+  const autoView: ViewKey = viewForActivity(bundle?.session.status, currentKind);
+  const view = manualView ?? autoView;
+  const setView = (v: ViewKey) => setManualView(v);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -61,6 +85,11 @@ export function PresentationMode({ sessionId }: { sessionId: string }) {
           </div>
           {current && bundle.session.status === "live" && <TimerPill timer={timer} />}
           <nav className="flex flex-wrap gap-1" aria-label="Vistas de proyección">
+            {manualView && (
+              <button onClick={() => setManualView(null)} className="cursor-pointer rounded-lg border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand hover:bg-sky">
+                ↻ Seguir la clase
+              </button>
+            )}
             {VIEWS.map((v) => (
               <button
                 key={v.key}

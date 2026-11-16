@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Check, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Users } from "lucide-react";
 import { EMOTIONS } from "@/lib/config/catalogs";
 import { PHASE_BY_KEY, type PhaseKey } from "@/lib/config/phases";
 import { clearTeamEmotion, setTeamEmotion, upsertEmotionVote } from "@/lib/data/mutations";
 import { emotionDistribution } from "@/lib/domain/journey";
-import { emotionSchema, firstError } from "@/lib/domain/validation";
 import type { Activity } from "@/lib/types";
-import { Button, Textarea } from "@/components/ui/primitives";
+import { Textarea } from "@/components/ui/primitives";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveHint } from "@/components/student/ContributionField";
 import { useLab } from "@/components/student/lab-context";
 import { EmotionSelector } from "./EmotionSelector";
 import { EmotionDistribution } from "./EmotionDistribution";
@@ -27,30 +28,29 @@ export function EmotionVotePanel({ activity, phase, compact }: { activity: Activ
 
   const [value, setValue] = useState<number | null>(myVote?.value ?? null);
   const [reason, setReason] = useState(myVote?.reason ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [teamReason, setTeamReason] = useState(selection?.reason ?? "");
+  const editing = useRef(false);
 
-  // Si llega el voto desde otro dispositivo (o tras recargar), sincronizar.
+  // El voto se guarda solo: al tocar un emoji y mientras se escribe el porqué.
+  const auto = useAutosave<{ value: number; reason: string }>((v) => upsertEmotionVote(activity, me, phase, v.value, v.reason), 700);
+
+  // Si llega el voto desde otro dispositivo (o tras recargar), sincronizar sin pisar lo que se escribe.
   useEffect(() => {
-    if (myVote) {
+    if (myVote && !editing.current && !auto.dirty) {
       setValue(myVote.value);
       setReason(myVote.reason);
     }
   }, [myVote?.id, myVote?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setTeamReason(selection?.reason ?? ""), [selection?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const save = async () => {
-    const msg = firstError(emotionSchema.safeParse({ value: value ?? 0, reason }));
-    if (msg) return setError(msg);
-    setBusy(true);
-    const err = await upsertEmotionVote(activity, me, phase, value!, reason);
-    setBusy(false);
-    if (err) return setError(err);
-    setError(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+  const pickEmoji = (v: number) => {
+    setValue(v);
+    auto.schedule({ value: v, reason });
+    void auto.flush();
+  };
+  const typeReason = (r: string) => {
+    setReason(r);
+    if (value) auto.schedule({ value, reason: r });
   };
 
   const choose = async (v: number) => {
@@ -58,8 +58,6 @@ export function EmotionVotePanel({ activity, phase, compact }: { activity: Activ
     const fallback = teamVotes.find((x) => x.value === v)?.reason ?? "";
     await setTeamEmotion(me, phase, v, teamReason.trim() || fallback);
   };
-
-  const dirty = value !== (myVote?.value ?? null) || reason !== (myVote?.reason ?? "");
 
   return (
     <section className="rounded-2xl border border-line bg-white p-4 shadow-card sm:p-5" style={{ borderTop: `4px solid ${p.color}` }}>
@@ -72,7 +70,7 @@ export function EmotionVotePanel({ activity, phase, compact }: { activity: Activ
 
       <div className={compact ? "grid gap-5 lg:grid-cols-[1.3fr_1fr]" : "grid gap-6 lg:grid-cols-[1.4fr_1fr]"}>
         <div className="space-y-3">
-          <EmotionSelector value={value} onChange={(v) => setValue(v)} disabled={!writable} size={compact ? "md" : "lg"} label={`Tu valoración para ${p.name}`} />
+          <EmotionSelector value={value} onChange={pickEmoji} disabled={!writable} size={compact ? "md" : "lg"} label={`Tu valoración para ${p.name}`} />
           <div>
             <label htmlFor={`reason-${phase}`} className="mb-1 block text-sm font-semibold text-navy-900">
               ¿Por qué crees que el cliente se siente así? <span className="text-red-600">*</span>
@@ -80,7 +78,12 @@ export function EmotionVotePanel({ activity, phase, compact }: { activity: Activ
             <Textarea
               id={`reason-${phase}`}
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => typeReason(e.target.value)}
+              onFocus={() => (editing.current = true)}
+              onBlur={() => {
+                editing.current = false;
+                void auto.flush();
+              }}
               disabled={!writable}
               rows={2}
               maxLength={600}
@@ -88,23 +91,16 @@ export function EmotionVotePanel({ activity, phase, compact }: { activity: Activ
               aria-required
             />
           </div>
-          {writable && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={save} loading={busy} disabled={!dirty && !!myVote}>
-                {myVote ? "Actualizar mi voto" : "Guardar mi voto"}
-              </Button>
-              {saved && (
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 animate-rise">
-                  <Check className="h-4 w-4" /> ¡Voto guardado!
-                </span>
-              )}
-              {error && (
-                <span className="text-sm font-medium text-red-700" role="alert">
-                  {error}
-                </span>
-              )}
-            </div>
-          )}
+          {writable &&
+            (!value ? (
+              <p className="text-xs text-muted">Toca un emoji: tu voto se guarda al momento.</p>
+            ) : reason.trim().length < 3 ? (
+              <p className="text-xs font-medium text-amber-700" role="status">
+                Voto guardado. Falta explicar el porqué: es obligatorio para el mapa.
+              </p>
+            ) : (
+              <AutosaveHint status={auto.status} error={auto.error} hasText />
+            ))}
         </div>
 
         <div className="rounded-xl bg-canvas p-3">
